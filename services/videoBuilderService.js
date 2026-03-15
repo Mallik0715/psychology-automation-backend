@@ -133,8 +133,8 @@ async function buildVideo(clips, voicePath, subtitlePath) {
     console.log("🗑️ Deleted old finalVideo.mp4");
   }
 
-  // const subtitleAbsolute = path.join(__dirname, "../storage/subtitles.srt");
-  const subtitleAbsolute = path.join(__dirname, "../storage/subtitles.ass");
+  const subtitleAbsolute = path.join(__dirname, "../storage/subtitles.srt");
+  // const subtitleAbsolute = path.join(__dirname, "../storage/subtitles.ass");
   const ffmpegSubtitlePath = subtitleAbsolute
     .replace(/\\/g, "/")
     .replace(/^([A-Z]):/, "$1\\:");
