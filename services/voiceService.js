@@ -66,9 +66,11 @@ async function generateVoiceElevenLabs(script, outputPath) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "playai-tts",
+      // model: "playai-tts",
+        model: "canopylabs/orpheus-v1-english",  // ✅ new model
       input: cleanScript,
-      voice: "Celeste-PlayAI",  // Natural female voice
+      // voice: "Celeste-PlayAI",  // Natural female voice
+        voice: "tara",  // ✅ natural female voice
       response_format: "mp3",
     }),
   });
