@@ -70,7 +70,7 @@ async function generateVoiceElevenLabs(script, outputPath) {
         model: "canopylabs/orpheus-v1-english",  // ✅ new model
       input: cleanScript,
       // voice: "Celeste-PlayAI",  // Natural female voice
-        voice: "tara",  // ✅ natural female voice
+        voice: "autumn",  // ✅ natural female voice
       response_format: "mp3",
     }),
   });
