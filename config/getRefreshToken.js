@@ -1,10 +1,12 @@
+
+
 const { google } = require("googleapis");
+const { env } = require("process");
 const readline = require("readline");
-
-const CLIENT_ID = "YOUR_CLIENT_ID";
-const CLIENT_SECRET = "YOUR_CLIENT_SECRET";
-const REDIRECT_URI = "urn:ietf:wg:oauth:2.0:oob";
-
+const CLIENT_ID = env.YOUTUBE_CLIENT_ID;
+const CLIENT_SECRET = env.YOUTUBE_CLIENT_SECRET;
+const REDIRECT_URI= "http://localhost:5000/callback"
+console.log("Redirect URI:", REDIRECT_URI);
 const oauth2Client = new google.auth.OAuth2(
   CLIENT_ID,
   CLIENT_SECRET,
@@ -12,6 +14,7 @@ const oauth2Client = new google.auth.OAuth2(
 );
 
 const authUrl = oauth2Client.generateAuthUrl({
+    prompt: "consent",
   access_type: "offline",
   scope: ["https://www.googleapis.com/auth/youtube.upload"],
 });

@@ -147,7 +147,7 @@ async function runPipeline() {
 
   } catch (error) {
     console.error("❌ Pipeline error:", error.message);
-    process.exit(1);
+    // process.exit(1);
   }
 }
 
