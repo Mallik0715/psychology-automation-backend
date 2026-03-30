@@ -37,13 +37,11 @@
 const { google } = require("googleapis");
 const fs = require("fs");
 const { getOAuthClient } = require("./authService");
-
 async function uploadToYouTube(videoPath, title, description, tags, thumbnailPath) {
   const auth = getOAuthClient();
   const youtube = google.youtube({ version: "v3", auth });
 
   console.log("📤 Uploading to YouTube...");
-
   const response = await youtube.videos.insert({
     part: ["snippet", "status"],
     requestBody: {
