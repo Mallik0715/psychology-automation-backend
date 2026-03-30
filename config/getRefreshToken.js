@@ -12,7 +12,9 @@ const oauth2Client = new google.auth.OAuth2(
   CLIENT_SECRET,
   REDIRECT_URI
 );
-
+oauth2Client.setCredentials({
+  refresh_token: process.env.YOUTUBE_REFRESH_TOKEN,
+});
 const authUrl = oauth2Client.generateAuthUrl({
     prompt: "consent",
   access_type: "offline",
