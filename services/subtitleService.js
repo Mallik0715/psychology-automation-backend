@@ -48,8 +48,8 @@ function secondsToSrtTimestamp(sec) {
   return `${h}:${m}:${s},${ms}`;
 }
 
-function vttTimeToSeconds(time) {
-  const parts = time.split(":");
+function timeToSeconds(time) {
+  const parts = time.replace(",", ".").split(":");
   let seconds = 0;
   if (parts.length === 3) {
     seconds = parseFloat(parts[0]) * 3600 + parseFloat(parts[1]) * 60 + parseFloat(parts[2]);
@@ -59,13 +59,13 @@ function vttTimeToSeconds(time) {
   return seconds;
 }
 
-function parseVTT(vttPath) {
-  if (!fs.existsSync(vttPath)) return null;
+function parseSubtitles(filePath) {
+  if (!fs.existsSync(filePath)) return null;
 
-  const content = fs.readFileSync(vttPath, "utf8");
+  const content = fs.readFileSync(filePath, "utf8");
   const blocks = content.split("\n\n").filter(b => b.trim() && !b.startsWith("WEBVTT"));
 
-  const words = [];
+  const sentences = [];
   for (const block of blocks) {
     const lines = block.trim().split("\n");
     const timeLine = lines.find(l => l.includes("-->"));
@@ -73,14 +73,14 @@ function parseVTT(vttPath) {
 
     if (timeLine && textLine) {
       const [startStr, endStr] = timeLine.split("-->").map(t => t.trim());
-      words.push({
-        start: vttTimeToSeconds(startStr),
-        end: vttTimeToSeconds(endStr),
-        word: textLine.trim()
+      sentences.push({
+        start: timeToSeconds(startStr),
+        end: timeToSeconds(endStr),
+        text: textLine.trim()
       });
     }
   }
-  return words;
+  return sentences;
 }
 
 async function generateSubtitles(sentences) {
@@ -88,39 +88,46 @@ async function generateSubtitles(sentences) {
   const vttPath = path.join(__dirname, "../storage/audio/words.vtt");
 
   let content = "";
-  const words = parseVTT(vttPath);
+  const audioSentences = parseSubtitles(vttPath);
 
-  if (words && words.length > 0) {
-    console.log("✅ Using real audio timings for stylish 2-word subtitles");
-    let chunkCount = 1;
-    for (let i = 0; i < words.length; i += 2) {
-      const w1 = words[i];
-      const w2 = i + 1 < words.length ? words[i + 1] : null;
-      
-      const start = w1.start;
-      const end = w2 ? w2.end : w1.end;
-      const text = w2 ? `${w1.word} ${w2.word}` : w1.word;
+  let chunkCount = 1;
+  const WORDS_PER_CHUNK = 7;
 
-      content += `${chunkCount}\n`;
-      content += `${secondsToSrtTimestamp(start)} --> ${secondsToSrtTimestamp(end)}\n`;
-      content += `${text.toUpperCase()}\n\n`;
-      chunkCount++;
+  if (audioSentences && audioSentences.length > 0) {
+    console.log(`✅ Using real audio timings to interpolate ${WORDS_PER_CHUNK}-word stylish subtitles`);
+    
+    for (const audioSentence of audioSentences) {
+      const words = audioSentence.text.split(" ").filter(w => w.trim());
+      if (words.length === 0) continue;
+
+      const duration = audioSentence.end - audioSentence.start;
+      const timePerWord = duration / words.length;
+
+      for (let i = 0; i < words.length; i += WORDS_PER_CHUNK) {
+        const chunkWords = words.slice(i, i + WORDS_PER_CHUNK);
+        const text = chunkWords.join(" ");
+        
+        const chunkStart = audioSentence.start + (i * timePerWord);
+        const chunkEnd = chunkStart + (timePerWord * chunkWords.length);
+
+        content += `${chunkCount}\n`;
+        content += `${secondsToSrtTimestamp(chunkStart)} --> ${secondsToSrtTimestamp(chunkEnd)}\n`;
+        content += `${text.toUpperCase()}\n\n`;
+        chunkCount++;
+      }
     }
   } else {
-    console.log("⚠️ Using estimated timings for stylish 2-word subtitles");
-    let chunkCount = 1;
+    console.log(`⚠️ Using purely estimated timings for ${WORDS_PER_CHUNK}-word stylish subtitles`);
     let start = 0;
     
     sentences.forEach((sentence) => {
       const sentenceWords = sentence.split(" ").filter(w => w.trim());
-      for (let i = 0; i < sentenceWords.length; i += 2) {
-        const w1 = sentenceWords[i];
-        const w2 = i + 1 < sentenceWords.length ? sentenceWords[i + 1] : null;
+      for (let i = 0; i < sentenceWords.length; i += WORDS_PER_CHUNK) {
+        const chunkWords = sentenceWords.slice(i, i + WORDS_PER_CHUNK);
+        const text = chunkWords.join(" ");
         
-        const text = w2 ? `${w1} ${w2}` : w1;
-        const wordCount = w2 ? 2 : 1;
-        // Estimate 0.35s per word for short punchy shorts
-        const duration = wordCount * 0.35; 
+        // Estimate 0.35s per word
+        const duration = chunkWords.length * 0.35; 
         const end = start + duration;
 
         content += `${chunkCount}\n`;

@@ -144,7 +144,7 @@ async function buildVideo(clips, voicePath, subtitlePath) {
 
   let command;
   
-  const subtitlesFilter = `subtitles='${ffmpegSubtitlePath}':force_style='Fontname=Arial Black,Fontsize=24,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=1.5,Shadow=1,Alignment=8,MarginV=85'`;
+  const subtitlesFilter = `subtitles='${ffmpegSubtitlePath}':force_style='Fontname=Arial Black,Fontsize=24,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=1.5,Shadow=1,Alignment=2,MarginV=86'`;
 
   if (hasMusic) {
     command = [
