@@ -48,7 +48,6 @@ function secondsToSrtTimestamp(sec) {
   return `${h}:${m}:${s},${ms}`;
 }
 
-// Parse VTT timestamp to seconds
 function vttTimeToSeconds(time) {
   const parts = time.split(":");
   let seconds = 0;
@@ -60,7 +59,6 @@ function vttTimeToSeconds(time) {
   return seconds;
 }
 
-// Parse edge-tts VTT file into word timings
 function parseVTT(vttPath) {
   if (!fs.existsSync(vttPath)) return null;
 
@@ -85,78 +83,53 @@ function parseVTT(vttPath) {
   return words;
 }
 
-// Match sentences to word timings
-function matchSentencesToTimings(sentences, words) {
-  if (!words || words.length === 0) return null;
-
-  const result = [];
-  let wordIndex = 0;
-
-  for (const sentence of sentences) {
-    const sentenceWords = sentence
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, "")
-      .split(/\s+/)
-      .filter(Boolean);
-
-    let startTime = null;
-    let endTime = null;
-    let matched = 0;
-
-    for (let i = wordIndex; i < words.length && matched < sentenceWords.length; i++) {
-      const vttWord = words[i].word.toLowerCase().replace(/[^a-z0-9]/g, "");
-      const sentWord = sentenceWords[matched].replace(/[^a-z0-9]/g, "");
-
-      if (vttWord === sentWord || vttWord.includes(sentWord) || sentWord.includes(vttWord)) {
-        if (startTime === null) startTime = words[i].start;
-        endTime = words[i].end;
-        matched++;
-        wordIndex = i + 1;
-      }
-    }
-
-    if (startTime !== null) {
-      result.push({ sentence, start: startTime, end: endTime });
-    }
-  }
-
-  return result;
-}
-
 async function generateSubtitles(sentences) {
   const output = path.join(__dirname, "../storage/subtitles.srt");
   const vttPath = path.join(__dirname, "../storage/audio/words.vtt");
 
   let content = "";
-
-  // ✅ Try to use real word timings from edge-tts VTT
   const words = parseVTT(vttPath);
-  const timings = words ? matchSentencesToTimings(sentences, words) : null;
 
-  if (timings && timings.length === sentences.length) {
-    console.log("✅ Using real audio timings for subtitles");
+  if (words && words.length > 0) {
+    console.log("✅ Using real audio timings for stylish 2-word subtitles");
+    let chunkCount = 1;
+    for (let i = 0; i < words.length; i += 2) {
+      const w1 = words[i];
+      const w2 = i + 1 < words.length ? words[i + 1] : null;
+      
+      const start = w1.start;
+      const end = w2 ? w2.end : w1.end;
+      const text = w2 ? `${w1.word} ${w2.word}` : w1.word;
 
-    timings.forEach((item, i) => {
-      content += `${i + 1}\n`;
-      content += `${secondsToSrtTimestamp(item.start)} --> ${secondsToSrtTimestamp(item.end)}\n`;
-      content += `${item.sentence}\n\n`;
-    });
-
-  } else {
-    // Fallback: estimate based on word count
-    console.log("⚠️ Using estimated timings for subtitles");
-
-    let start = 0;
-    sentences.forEach((sentence, i) => {
-      const wordCount = sentence.split(" ").length;
-      const duration = Math.max(2, wordCount * 0.4); // ~0.4 seconds per word
-      const end = start + duration;
-
-      content += `${i + 1}\n`;
+      content += `${chunkCount}\n`;
       content += `${secondsToSrtTimestamp(start)} --> ${secondsToSrtTimestamp(end)}\n`;
-      content += `${sentence}\n\n`;
+      content += `${text.toUpperCase()}\n\n`;
+      chunkCount++;
+    }
+  } else {
+    console.log("⚠️ Using estimated timings for stylish 2-word subtitles");
+    let chunkCount = 1;
+    let start = 0;
+    
+    sentences.forEach((sentence) => {
+      const sentenceWords = sentence.split(" ").filter(w => w.trim());
+      for (let i = 0; i < sentenceWords.length; i += 2) {
+        const w1 = sentenceWords[i];
+        const w2 = i + 1 < sentenceWords.length ? sentenceWords[i + 1] : null;
+        
+        const text = w2 ? `${w1} ${w2}` : w1;
+        const wordCount = w2 ? 2 : 1;
+        // Estimate 0.35s per word for short punchy shorts
+        const duration = wordCount * 0.35; 
+        const end = start + duration;
 
-      start = end;
+        content += `${chunkCount}\n`;
+        content += `${secondsToSrtTimestamp(start)} --> ${secondsToSrtTimestamp(end)}\n`;
+        content += `${text.toUpperCase()}\n\n`;
+        
+        start = end;
+        chunkCount++;
+      }
     });
   }
 
@@ -165,3 +138,4 @@ async function generateSubtitles(sentences) {
 }
 
 module.exports = { generateSubtitles };
+

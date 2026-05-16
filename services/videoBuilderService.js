@@ -143,6 +143,8 @@ async function buildVideo(clips, voicePath, subtitlePath) {
   console.log(hasMusic ? "🎵 Background music found!" : "⚠️ No background music found, skipping...");
 
   let command;
+  
+  const subtitlesFilter = `subtitles='${ffmpegSubtitlePath}':force_style='Fontname=Arial Black,Fontsize=90,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=4,Shadow=2,Alignment=8,MarginV=576'`;
 
   if (hasMusic) {
     command = [
@@ -152,7 +154,7 @@ async function buildVideo(clips, voicePath, subtitlePath) {
       `-i "${clipsListPath}"`,
       `-i "${voicePath}"`,
       `-stream_loop -1 -i "${musicPath}"`,
-      `-vf "fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920"`,
+      `-vf "fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,${subtitlesFilter}"`,
       `-filter_complex "[1:a]volume=1.0[voice];[2:a]volume=0.15[music];[voice][music]amix=inputs=2:duration=first[aout]"`,
       `-map 0:v:0`,
       `-map "[aout]"`,
@@ -167,7 +169,7 @@ async function buildVideo(clips, voicePath, subtitlePath) {
       `-f concat -safe 0 -r 30`,
       `-i "${clipsListPath}"`,
       `-i "${voicePath}"`,
-      `-vf "fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920"`,
+      `-vf "fps=30,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,${subtitlesFilter}"`,
       `-map 0:v:0 -map 1:a:0`,
       `-c:v libx264 -c:a aac`,
       `-shortest`,

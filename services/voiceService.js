@@ -94,7 +94,8 @@ async function generateVoiceEdgeTTS(script, outputPath, wordsVttPath) {
     .replace(/"/g, "")
     .trim();
 
-  const command = `python -m edge_tts --voice en-US-AriaNeural --text "${cleanScript}" --write-media "${outputPath}" --write-subtitles "${wordsVttPath}"`;
+  // Changed to en-US-ChristopherNeural for a more dramatic, viral-friendly voice
+  const command = `python -m edge_tts --voice en-US-ChristopherNeural --rate=+5% --text "${cleanScript}" --write-media "${outputPath}" --write-subtitles "${wordsVttPath}"`;
 
   return new Promise((resolve, reject) => {
     exec(command, (error) => {
@@ -116,21 +117,21 @@ async function generateVoice(script) {
   const outputPath = path.join(__dirname, "../storage/audio/voice.mp3");
   const wordsVttPath = path.join(__dirname, "../storage/audio/words.vtt");
 
-  // Step 1: Try ElevenLabs via Groq first
-  try {
-    await generateVoiceElevenLabs(script, outputPath);
-    return outputPath;
-  } catch (err) {
-    console.error("❌ ElevenLabs failed:", err.message);
-    console.log("⚠️ Falling back to edge-tts...");
-  }
-
-  // Step 2: Fallback to edge-tts
+  // To guarantee perfectly synced subtitles, prioritize edge-tts which generates words.vtt
   try {
     await generateVoiceEdgeTTS(script, outputPath, wordsVttPath);
     return outputPath;
   } catch (err) {
-    console.error("❌ Edge-tts also failed:", err.message);
+    console.error("❌ Edge-tts failed:", err.message);
+    console.log("⚠️ Falling back to ElevenLabs...");
+  }
+
+  // Fallback to ElevenLabs (estimated timings will be used)
+  try {
+    await generateVoiceElevenLabs(script, outputPath);
+    return outputPath;
+  } catch (err) {
+    console.error("❌ ElevenLabs also failed:", err.message);
     throw new Error("Both TTS services failed");
   }
 }
