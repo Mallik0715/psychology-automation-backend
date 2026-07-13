@@ -227,7 +227,7 @@ Import Services
 -------------------------------------------------------
 */
 
-const { getRandomTopic } = require("./services/topicService");
+const { getNextTopic } = require("./services/topicService");
 const { generateScript } = require("./services/scriptService");
 const { splitIntoSentences } = require("./services/sentenceService");
 const { searchClips } = require("./services/clipSearchService");
@@ -461,7 +461,7 @@ async function runPipeline() {
   try {
     console.log("========== PIPELINE START ==========");
 
-    const topic = getRandomTopic();
+    const topic = getNextTopic();
     console.log("🎯 Topic:", topic);
 
     const script = await generateScript(topic);
