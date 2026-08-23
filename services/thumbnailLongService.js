@@ -1,13 +1,10 @@
 const { createCanvas, loadImage } = require("canvas");
 const fs = require("fs");
 const path = require("path");
-const Groq = require("groq-sdk");
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const { createGroqCompletion } = require("./groqHelper");
 
 async function generateThumbnailPrompt(topic) {
-  const response = await groq.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
+  const response = await createGroqCompletion({
     messages: [
       {
         role: "system",
@@ -108,7 +105,7 @@ async function generateLongThumbnail(topic) {
     console.warn("⚠️ Groq thumbnail prompt failed, using defaults:", err.message);
     thumbnailData = {
       imagePrompt: `dramatic human brain glowing thoughts ${topic}`,
-      unsplashQuery: topic,
+      unsplashQuery: "brain psychology",
       topLabel: "25 MIND FACTS",
       mainText: topic.toUpperCase().slice(0, 25),
       bottomText: "YOU DIDN'T KNOW THIS!",
@@ -119,7 +116,7 @@ async function generateLongThumbnail(topic) {
   // Step 1: Draw background image (Unsplash -> Pollinations -> Gradient)
   let bgImage = null;
   try {
-    bgImage = await fetchUnsplashImage(thumbnailData.unsplashQuery || topic);
+    bgImage = await fetchUnsplashImage(thumbnailData.unsplashQuery || "brain psychology");
   } catch (err) {
     console.log("⚠️ Unsplash fallback to Pollinations...");
     try {

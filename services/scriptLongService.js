@@ -1,8 +1,4 @@
-const Groq = require("groq-sdk");
-
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+const { createGroqCompletion } = require("./groqHelper");
 
 /**
  * Generates a 5-minute compilation script of 25-30 rapid-fire psychology/science facts.
@@ -11,8 +7,7 @@ async function generateLongScript(topic) {
   try {
     console.log("🤖 Generating 5-minute compilation script (25-30 Facts) for:", topic);
 
-    const response = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+    const response = await createGroqCompletion({
       messages: [
         {
           role: "system",
@@ -41,8 +36,7 @@ Format and Structure Rules:
     console.log("✅ 25-30 Facts Compilation Script generated (~" + scriptText.split(/\s+/).length + " words)");
 
     // Generate visual B-roll keywords across different fact themes
-    const keywordResponse = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+    const keywordResponse = await createGroqCompletion({
       messages: [
         {
           role: "system",

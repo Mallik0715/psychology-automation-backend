@@ -1,8 +1,4 @@
-const Groq = require("groq-sdk");
-
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+const { createGroqCompletion } = require("./groqHelper");
 
 /**
  * Generates high-CTR SEO Title, description, and hashtags for a 25-30 facts compilation video.
@@ -11,8 +7,7 @@ async function generateLongSEO(topic, script) {
   try {
     console.log("🔍 Generating high-CTR SEO metadata for 25-facts compilation video:", topic);
 
-    const response = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+    const response = await createGroqCompletion({
       messages: [
         {
           role: "system",
@@ -55,7 +50,8 @@ Return exact JSON format:
 
   } catch (error) {
     console.error("❌ Groq SEO error:", error.message);
-    const fallbackTitle = `25 Mind-Blowing Psychology Facts About ${topic}`;
+    const cleanTopic = topic.replace(/^(25|30)\s+/i, "");
+    const fallbackTitle = `25 Mind-Blowing Psychology Facts About ${cleanTopic}`;
     const fallbackDesc = `Here are 25 incredible and surprising psychology facts about human behavior, brain chemistry, and human nature.\n\n0:00 Introduction\n1:00 Mind & Brain Facts\n2:30 Human Behavior Facts\n4:00 Final Takeaways\n\n#psychology #facts #brainfacts`;
     return {
       title: fallbackTitle,

@@ -200,13 +200,10 @@
 const { createCanvas, loadImage } = require("canvas");
 const fs = require("fs");
 const path = require("path");
-const Groq = require("groq-sdk");
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const { createGroqCompletion } = require("./groqHelper");
 
 async function generateThumbnailPrompt(topic) {
-  const response = await groq.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
+  const response = await createGroqCompletion({
     messages: [
       {
         role: "system",
