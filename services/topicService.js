@@ -912,38 +912,70 @@ const topics = [
 
 ];
 
+const longTopics = [
+  "25 Dark Psychology Facts About Human Nature",
+  "30 Unbelievable Facts About How Your Brain Works",
+  "25 Mind-Blowing Psychology Facts About Attraction and Relationships",
+  "30 Shocking Psychological Facts About Dreams and Sleep",
+  "25 Uncomfortable Psychology Facts Nobody Tells You",
+  "30 Secrets of Body Language & How to Read Anyone Instantly",
+  "25 Mind Control and Manipulation Tricks People Use Every Day",
+  "30 Science-Backed Facts About Memory, Intelligence and Focus",
+  "25 Psychological Facts About Stress, Anxiety and Emotion",
+  "30 Surprising Facts About Human Behavior and Decision Making",
+  "25 Facts About Why People Lie, Cheat and Deceive",
+  "30 Psychological Facts About Introverts vs Extroverts",
+  "25 Mind-Blowing Facts About Subconscious Mind and Habits",
+  "30 Facts About How Your Childhood Shapes Your Adult Life",
+  "25 Dark Psychology Tactics Used by Advertisers to Control You",
+  "30 Mind-Blowing Facts About Dopamine and Brain Addiction",
+  "25 Psychological Reasons Why You Feel Lonely and Misunderstood",
+  "30 Facts About Love, Heartbreak and Attachment Styles",
+  "25 Unbelievable Facts About Pain, Fear and Survival Instincts",
+  "30 Mind-Blowing Psychology Facts About Happiness and Gratitude",
+  "25 Shocking Facts About What Happens to Your Brain When You Sleep",
+  "30 Facts About High-IQ People and How Their Minds Work",
+  "25 Dark Psychology Secrets of Narcissists and Manipulators",
+  "30 Psychological Facts About Eye Contact and First Impressions",
+  "25 Surprising Facts About Social Media and Brain Chemistry"
+];
+
 const fs = require("fs");
 const path = require("path");
 
 const PROGRESS_FILE = path.join(__dirname, "topic_progress.json");
+const LONG_PROGRESS_FILE = path.join(__dirname, "topic_long_progress.json");
 
-function loadIndex() {
+function loadIndex(file) {
   try {
-    const data = JSON.parse(fs.readFileSync(PROGRESS_FILE, "utf8"));
+    const data = JSON.parse(fs.readFileSync(file, "utf8"));
     return typeof data.index === "number" ? data.index : 0;
   } catch (err) {
-    return 0; // file doesn't exist yet, or is unreadable - start from the beginning
+    return 0;
   }
 }
 
-function saveIndex(index) {
-  fs.writeFileSync(PROGRESS_FILE, JSON.stringify({ index }), "utf8");
+function saveIndex(file, index) {
+  fs.writeFileSync(file, JSON.stringify({ index }), "utf8");
 }
 
 function getNextTopic() {
-  let index = loadIndex();
-
-  if (index >= topics.length) {
-    index = 0; // all topics used - restart from the beginning
-  }
-
+  let index = loadIndex(PROGRESS_FILE);
+  if (index >= topics.length) index = 0;
   const topic = topics[index];
-  saveIndex(index + 1);
-
+  saveIndex(PROGRESS_FILE, index + 1);
   return topic;
 }
 
-module.exports = { getNextTopic, topics };
+function getNextLongTopic() {
+  let index = loadIndex(LONG_PROGRESS_FILE);
+  if (index >= longTopics.length) index = 0;
+  const topic = longTopics[index];
+  saveIndex(LONG_PROGRESS_FILE, index + 1);
+  return topic;
+}
+
+module.exports = { getNextTopic, getNextLongTopic, topics, longTopics };
 // // }
 
 // // module.exports = { getRandomTopic };

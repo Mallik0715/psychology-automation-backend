@@ -1,72 +1,27 @@
-# name: Daily YouTube Upload
-
-# # on:
-# #   schedule:
-# #     - cron: '30 3 * * *' 
-# #   workflow_dispatch:        
-# # on:
-# #   schedule:
-# #     - cron: '30 1 * * *'   # 7:00 AM IST
-# #     - cron: '30 6 * * *'   # 12:00 PM IST
-# #     - cron: '30 12 * * *'  # 6:00 PM IST
-# #   workflow_dispatch:
-# on:
-#   schedule:
-#     - cron: '30 13 * * *'   # 7:00 PM IST
-#   workflow_dispatch:      #comment line
-# jobs:
-#   upload:
-#     runs-on: ubuntu-latest
-
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v3
-
-#       - name: Setup Node.js
-#         uses: actions/setup-node@v3
-#         with:
-#           node-version: '20'
-
-#       - name: Install Node dependencies
-#         run: npm install
-
-#       - name: Setup Python
-#         uses: actions/setup-python@v4
-#         with:
-#           python-version: '3.10'
-
-#       - name: Install Python dependencies
-#         run: pip install edge-tts
-
-#       - name: Install FFmpeg
-#         run: sudo apt-get install -y ffmpeg
-
-#       - name: Run video pipeline
-#         env:
-#           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-#           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
-#           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
-#           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
-#           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
-#         run: node pipeline.js 
-
-
-
-
-
-
-
-name: Daily YouTube Upload
+name: Psychology Channel Uploads (Daily Short + Weekly Long Video)
 
 on:
   schedule:
-    - cron: '30 1 * * *'   # 7:00 AM IST
-    - cron: '30 6 * * *'   # 12:00 PM IST
-    - cron: '0 14 * * *'    # 7:30 PM IST
+    # Daily Short at 7:30 PM IST (14:00 UTC)
+    - cron: '0 14 * * *'
+    # Weekly 5-Minute Long Video every Sunday at 12:00 PM IST (06:30 UTC)
+    - cron: '30 6 * * 0'
   workflow_dispatch:
+    inputs:
+      video_type:
+        description: 'Choose video type to generate'
+        required: true
+        default: 'short'
+        type: choice
+        options:
+          - short
+          - long
 
 jobs:
-  upload:
+  upload-daily-short:
+    name: Upload Daily Short
+    # Run if triggered manually or if it's NOT Sunday 6:30 UTC (long video slot)
+    if: github.event_name == 'schedule' && github.event.schedule == '0 14 * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.video_type == 'short')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -85,28 +40,19 @@ jobs:
           python-version: '3.10'
       - name: Install Python dependencies
         run: pip install edge-tts
-      # - name: Install FFmpeg
-      #   run: |
-      #        wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
-      #        tar xf ffmpeg-release-amd64-static.tar.xz
-      #        sudo mv ffmpeg-*-amd64-static/ffmpeg /usr/local/bin/
-      #        sudo mv ffmpeg-*-amd64-static/ffprobe /usr/local/bin/
-      #        ffmpeg -version
       - name: Install FFmpeg
         run: |
-              sudo apt-get update
-              sudo apt-get install -y ffmpeg
-              ffmpeg -version
-
-      - name: Run video pipeline
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version
+      - name: Run Daily Short pipeline
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
-          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}  
-
+          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
         run: node pipeline.js
 
       - name: Commit updated topic progress
@@ -117,3 +63,47 @@ jobs:
           git diff --staged --quiet || git commit -m "Update topic progress [skip ci]"
           git push
 
+  upload-weekly-long-video:
+    name: Upload Weekly 5-Min Long Video
+    # Run if scheduled on Sunday at 06:30 UTC or manually selected
+    if: github.event_name == 'schedule' && github.event.schedule == '30 6 * * 0' || (github.event_name == 'workflow_dispatch' && github.event.inputs.video_type == 'long')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+      - name: Install Node dependencies
+        run: npm install
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Install Python dependencies
+        run: pip install edge-tts
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version
+      - name: Run Weekly 5-Minute Video pipeline
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
+        run: node pipeline-long.js
+
+      - name: Commit updated topic progress
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add services/topic_progress.json
+          git diff --staged --quiet || git commit -m "Update topic progress [skip ci]"
+          git push
