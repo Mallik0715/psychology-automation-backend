@@ -1,4 +1,5 @@
 const { createGroqCompletion } = require("./groqHelper");
+const { parseLLMJson } = require("./jsonHelper");
 
 /**
  * Generates high-CTR SEO Title, description, and hashtags for a 25-30 facts compilation video.
@@ -37,7 +38,7 @@ Return exact JSON format:
     });
 
     const raw = response.choices[0].message.content.trim();
-    const seoData = JSON.parse(raw);
+    const seoData = parseLLMJson(raw);
 
     const fullDescription = `${seoData.description}\n\n${(seoData.hashtags || []).join(" ")}\n\n#psychology #facts #brainfacts #mindset #education`;
 

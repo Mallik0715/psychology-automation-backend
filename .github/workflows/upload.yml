@@ -3,9 +3,9 @@ name: Psychology Channel Uploads (Daily Short + Weekly Long Video)
 on:
   schedule:
     # Daily Short at 7:30 PM IST (14:00 UTC)
-    - cron: '0 14 * * *'
+    - cron: '0 23 * * *'   # daily Short: 7:00 PM ET / 4:30 AM IST
     # Weekly 5-Minute Long Video every Sunday at 12:00 PM IST (06:30 UTC)
-    - cron: '30 6 * * 0'
+    - cron: '0 16 * * 0'   # weekly long video: Sunday 12:00 PM ET / 9:30 PM IST
   workflow_dispatch:
     inputs:
       video_type:
@@ -17,27 +17,34 @@ on:
           - short
           - long
 
+# Never run two uploads at once (they'd race on topic_progress.json)
+concurrency:
+  group: youtube-upload
+  cancel-in-progress: false
+
 jobs:
   upload-daily-short:
     name: Upload Daily Short
     # Run if triggered manually or if it's NOT Sunday 6:30 UTC (long video slot)
-    if: github.event_name == 'schedule' && github.event.schedule == '0 14 * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.video_type == 'short')
+    if: github.event_name == 'schedule' && github.event.schedule == '0 23 * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.video_type == 'short')
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
       - name: Install Node dependencies
-        run: npm install
+        run: npm ci
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.12'
       - name: Install Python dependencies
         run: pip install edge-tts
       - name: Install FFmpeg
@@ -52,7 +59,6 @@ jobs:
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
-          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
         run: node pipeline.js
 
       - name: Commit updated topic progress
@@ -60,29 +66,33 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add services/topic_progress.json
-          git diff --staged --quiet || git commit -m "Update topic progress [skip ci]"
+          git diff --staged --quiet && exit 0
+          git commit -m "Update topic progress [skip ci]"
+          git pull --rebase
           git push
 
   upload-weekly-long-video:
     name: Upload Weekly 5-Min Long Video
     # Run if scheduled on Sunday at 06:30 UTC or manually selected
-    if: github.event_name == 'schedule' && github.event.schedule == '30 6 * * 0' || (github.event_name == 'workflow_dispatch' && github.event.inputs.video_type == 'long')
+    if: github.event_name == 'schedule' && github.event.schedule == '0 16 * * 0' || (github.event_name == 'workflow_dispatch' && github.event.inputs.video_type == 'long')
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
       - name: Install Node dependencies
-        run: npm install
+        run: npm ci
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.12'
       - name: Install Python dependencies
         run: pip install edge-tts
       - name: Install FFmpeg
@@ -100,10 +110,12 @@ jobs:
           UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
         run: node pipeline-long.js
 
-      - name: Commit updated topic progress
+      - name: Commit updated long-video topic progress
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add services/topic_progress.json
-          git diff --staged --quiet || git commit -m "Update topic progress [skip ci]"
+          git add services/topic_long_progress.json
+          git diff --staged --quiet && exit 0
+          git commit -m "Update topic progress [skip ci]"
+          git pull --rebase
           git push

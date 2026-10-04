@@ -1,4 +1,5 @@
 const { createGroqCompletion } = require("./groqHelper");
+const { parseLLMJson } = require("./jsonHelper");
 
 async function generateSEO(topic, script) {
   try {
@@ -30,7 +31,7 @@ Return this exact JSON format:
     });
 
     const raw = response.choices[0].message.content.trim();
-    const seo = JSON.parse(raw);
+    const seo = parseLLMJson(raw);
 
     console.log("✅ SEO generated:", seo.title);
     return seo;

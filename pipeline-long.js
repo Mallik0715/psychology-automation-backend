@@ -31,6 +31,7 @@ const requiredEnv = [
   "YOUTUBE_CLIENT_SECRET",
   "YOUTUBE_REFRESH_TOKEN",
   "GROQ_API_KEY",
+  "PIXABAY_API_KEY",
 ];
 
 for (const key of requiredEnv) {
@@ -72,7 +73,9 @@ const { getNextLongTopic } = require("./services/topicService");
 const { generateLongScript } = require("./services/scriptLongService");
 const { generateLongSEO } = require("./services/seoLongService");
 const { splitIntoSentences } = require("./services/sentenceService");
-const { searchLongClips } = require("./services/clipSearchLongService");
+const { searchClips } = require("./services/clipSearchService");
+const { getVisualQueries } = require("./services/visualService");
+const { checkAccuracy } = require("./services/accuracyService");
 const { downloadClip } = require("./services/clipDownloadService");
 const { generateVoice } = require("./services/voiceService");
 const { generateSubtitles } = require("./services/subtitleService");
@@ -94,21 +97,23 @@ async function runLongPipeline() {
     console.log("🎯 Long Video Topic:", topic);
 
     // 2. Script
-    const { script, keywords } = await generateLongScript(topic);
+    const { script: draft, keywords } = await generateLongScript(topic);
+    const script = await checkAccuracy(draft, { maxTokens: 16000 });
     console.log("📝 Long script generated");
 
     // 3. High-CTR SEO & Hashtags
     const seo = await generateLongSEO(topic, script);
     console.log("🔍 High-CTR Title generated:", seo.title);
 
-    // 4. Sentences & Subtitles
+    // 4. Sentences
     const sentences = splitIntoSentences(script);
     console.log("📄 Sentences:", sentences.length);
-    const subtitlePath = await generateSubtitles(sentences);
-    console.log("🎬 Subtitles generated:", subtitlePath);
 
     // 5. B-Roll Stock Footage (20-30 Clips)
-    const clips = await searchLongClips(topic, keywords);
+    // Footage searches come from the script itself (in order), plus the script service's own keywords
+    const visualQueries = await getVisualQueries(topic, script, 12);
+    const queries = [...new Set([...visualQueries, ...keywords.map(k => String(k).toLowerCase())])];
+    const clips = await searchClips(queries, { maxClips: 30, perQuery: 4 });
     console.log(`🎥 Downloadable B-roll clips found: ${clips.length}`);
 
     const downloadedClips = [];
@@ -120,11 +125,18 @@ async function runLongPipeline() {
         console.warn(`⚠️ Failed to download clip ${i + 1}: ${err.message}`);
       }
     }
+    if (downloadedClips.length === 0) {
+      throw new Error("No clips could be downloaded");
+    }
     console.log(`⬇️ Successfully downloaded ${downloadedClips.length} clips.`);
 
     // 6. Voice Audio Generation
     const voicePath = await generateVoice(script);
     console.log("🔊 Voice narration generated:", voicePath);
+
+    // Subtitles must come after the voice: they use the word timings edge-tts writes
+    const subtitlePath = await generateSubtitles(sentences, { width: 1920, height: 1080 });
+    console.log("🎬 Subtitles generated:", subtitlePath);
 
     // 7. Video Build (16:9 Widescreen 1920x1080)
     const finalVideo = await buildLongVideo(

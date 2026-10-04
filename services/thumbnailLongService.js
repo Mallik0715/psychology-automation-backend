@@ -2,6 +2,7 @@ const { createCanvas, loadImage } = require("canvas");
 const fs = require("fs");
 const path = require("path");
 const { createGroqCompletion } = require("./groqHelper");
+const { parseLLMJson } = require("./jsonHelper");
 
 async function generateThumbnailPrompt(topic) {
   const response = await createGroqCompletion({
@@ -30,7 +31,7 @@ Return exact JSON format:
   });
 
   const raw = response.choices[0].message.content.trim();
-  return JSON.parse(raw);
+  return parseLLMJson(raw);
 }
 
 // Fetch Unsplash image

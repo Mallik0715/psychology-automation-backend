@@ -4,34 +4,45 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
+// Groq retires models regularly (all Llama 3.x / Mixtral models are gone).
+// Tried in order; set GROQ_MODEL to put a specific model first.
+// Check available models: GET https://api.groq.com/openai/v1/models
 const CANDIDATE_MODELS = [
-  "llama-3.3-70b-versatile",
-  "llama-3.1-70b-versatile",
-  "llama-3.1-8b-instant",
-  "llama3-70b-8192",
-  "mixtral-8x7b-32768"
-];
+  process.env.GROQ_MODEL,
+  "openai/gpt-oss-120b",
+  "openai/gpt-oss-20b",
+].filter(Boolean);
+
+function isModelUnavailable(err) {
+  const msg = err.message || "";
+  return err.status === 404 || msg.includes("model_not_found") || msg.includes("decommissioned");
+}
 
 /**
- * Executes a Groq chat completion with automatic model fallback
- * to prevent 404 model_not_found errors across different accounts & SDK versions.
+ * Executes a Groq chat completion with automatic model fallback.
  */
 async function createGroqCompletion(params) {
+  const { max_tokens, ...rest } = params;
   let lastError = null;
+
   for (const model of CANDIDATE_MODELS) {
+    const request = { ...rest, model };
+    if (model.startsWith("openai/gpt-oss")) {
+      // Reasoning model: keep reasoning short and leave room for the actual answer
+      request.reasoning_effort = rest.reasoning_effort || "low";
+      if (max_tokens) request.max_completion_tokens = max_tokens + 1000;
+    } else if (max_tokens) {
+      request.max_completion_tokens = max_tokens;
+    }
+
     try {
-      const response = await groq.chat.completions.create({
-        ...params,
-        model: model
-      });
-      return response;
+      return await groq.chat.completions.create(request);
     } catch (err) {
       lastError = err;
-      if (err.status === 404 || (err.message && err.message.includes("model_not_found"))) {
-        console.warn(`⚠️ Groq model "${model}" returned 404. Falling back to next candidate model...`);
+      if (isModelUnavailable(err)) {
+        console.warn(`⚠️ Groq model "${model}" unavailable. Trying next candidate model...`);
         continue;
       }
-      // If it's another error (like auth error or rate limit), throw immediately
       throw err;
     }
   }

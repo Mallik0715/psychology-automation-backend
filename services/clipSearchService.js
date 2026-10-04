@@ -1,75 +1,58 @@
-
-// const axios = require("axios");
-
-// const API_KEY = process.env.PIXABAY_API_KEY;
-
-// async function searchClips(topic) {
-
-//   try {
-
-//     const query = topic.split(" ").pop().toLowerCase();
-
-//     const response = await axios.get(
-//       `https://pixabay.com/api/videos/?key=${API_KEY}&q=${query}&per_page=5`
-//     );
-
-//     const videos = response.data.hits;
-
-//     if (!videos || videos.length === 0) return [];
-
-//     const clips = videos.map(video => video.videos.medium.url);
-
-//     return clips;
-
-//   } catch (error) {
-
-//     console.log("Pixabay error:", error.message);
-//     return [];
-
-//   }
-
-// }
-
-// module.exports = { searchClips };
-
 const axios = require("axios");
 
 const API_KEY = process.env.PIXABAY_API_KEY;
 
-async function searchClips(topic) {
-  // Generate multiple search queries to try
-  const words = topic.split(" ").filter(w => w.length > 3);
-  
-  const queries = [
-    words.slice(0, 2).join(" "),      // first 2 words
-    words[0],                          // first word
-    words[words.length - 1],           // last word
-    words[Math.floor(words.length/2)], // middle word
-    "people",                          // ultimate fallback
-  ];
+// Broad, always-available footage for this channel's niche, used only if the
+// script-specific searches come back thin
+const FALLBACK_QUERIES = ["galaxy stars", "earth from space", "ocean aerial", "ancient ruins", "technology"];
+const MIN_CLIPS = 6;
+const MAX_CLIPS = 10;
 
-  for (const query of queries) {
-    try {
-      console.log(`🔍 Searching Pixabay for: "${query}"`);
-      const response = await axios.get(
-        `https://pixabay.com/api/videos/?key=${API_KEY}&q=${encodeURIComponent(query)}&per_page=5`
-      );
-
-      const videos = response.data.hits;
-
-      if (videos && videos.length > 0) {
-        console.log(`✅ Found ${videos.length} clips for: "${query}"`);
-        return videos.map(video => video.videos.medium.url);
-      }
-
-      console.log(`⚠️ No clips for "${query}", trying next...`);
-    } catch (error) {
-      console.log("Pixabay error:", error.message);
-    }
+async function pixabaySearch(query, perPage = 3) {
+  try {
+    const response = await axios.get("https://pixabay.com/api/videos/", {
+      params: { key: API_KEY, q: query, per_page: perPage, safesearch: true },
+      timeout: 15000,
+    });
+    return (response.data.hits || [])
+      .map(video => video.videos.medium?.url || video.videos.small?.url)
+      .filter(Boolean);
+  } catch (error) {
+    console.log(`Pixabay error for "${query}":`, error.message);
+    return [];
   }
-
-  console.log("❌ No clips found for any query!");
-  return [];
 }
 
-module.exports = { searchClips };
+/**
+ * @param {string[]} queries - script-specific searches from visualService, in script order
+ * @param {{maxClips?: number, perQuery?: number, fallbackQueries?: string[]}} [options]
+ */
+async function searchClips(queries, options = {}) {
+  const { maxClips = MAX_CLIPS, perQuery = 3, fallbackQueries = FALLBACK_QUERIES } = options;
+  const minClips = Math.min(MIN_CLIPS * 2, Math.max(MIN_CLIPS, Math.ceil(maxClips / 2)));
+  const groups = [];
+  for (const query of queries) {
+    const found = await pixabaySearch(query, perQuery);
+    console.log(`🔍 "${query}": ${found.length} clips`);
+    groups.push(found);
+  }
+
+  for (const query of fallbackQueries) {
+    if (groups.flat().length >= minClips) break;
+    console.log(`⚠️ Not enough clips yet, trying fallback: "${query}"`);
+    groups.push(await pixabaySearch(query, perQuery));
+  }
+
+  // Round-robin so footage follows the script order instead of 3 near-identical clips in a row
+  const picked = [];
+  const longest = Math.max(0, ...groups.map(g => g.length));
+  for (let i = 0; i < longest && picked.length < maxClips; i++) {
+    for (const group of groups) {
+      const url = group[i];
+      if (url && !picked.includes(url) && picked.length < maxClips) picked.push(url);
+    }
+  }
+  return picked;
+}
+
+module.exports = { searchClips, FALLBACK_QUERIES };
