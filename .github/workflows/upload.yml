@@ -50,13 +50,21 @@ jobs:
       - name: Install local rendering and speech tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg espeak-ng fonts-dejavu-core
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install neural speech engine
+        run: python -m pip install -r requirements-voice.txt
       - name: Test the complete 100-topic catalog and renderer
         run: npm test
       - name: Render preview or publish a public Short
         env:
           TOPIC_ID: ${{ inputs.topic_id || '' }}
           PUBLISH_SHORT: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}
+          TTS_PROVIDER: edge
+          TTS_VOICE: en-US-AndrewMultilingualNeural
+          TTS_RATE: '+8%'
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}

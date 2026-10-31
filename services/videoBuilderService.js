@@ -14,6 +14,7 @@ async function buildVideo(scenes, voicePath, subtitlePath, options = {}) {
   if (timeline.length !== scenes.length || timeline.some((s, i) => s.text !== scenes[i].text || !(s.end > s.start))) {
     throw new Error("Narration timings do not match this script");
   }
+  const renderScenes = scenes.map((scene, i) => ({ ...scene, shots: timeline[i].shots || scene.shots }));
   // Use a denser source canvas for finer illustrated details. Captions are
   // composed at the final output resolution.
   const rw = Math.round(width * 0.75), rh = Math.round(height * 0.75);
@@ -23,8 +24,7 @@ async function buildVideo(scenes, voicePath, subtitlePath, options = {}) {
   const escapedSubtitle = subtitlePath.replace(/\\/g, "/").replace(/^([A-Za-z]):/, "$1\\:");
   const args = ["-y", "-f", "rawvideo", "-pixel_format", "bgra", "-video_size", rw + "x" + rh,
     "-framerate", String(fps), "-i", "pipe:0", "-i", voicePath,
-    "-f", "lavfi", "-i", "aevalsrc=0.035*sin(2*PI*110*t)+0.02*sin(2*PI*165*t):s=44100",
-    "-filter_complex", "[0:v]scale=" + width + ":" + height + ":flags=lanczos,subtitles='" + escapedSubtitle + "'[v];[2:a]lowpass=f=500,volume=0.3[m];[1:a][m]amix=inputs=2:duration=first:normalize=0[a]",
+    "-filter_complex", "[0:v]scale=" + width + ":" + height + ":flags=lanczos,subtitles='" + escapedSubtitle + "'[v];[1:a]alimiter=limit=0.95:level=false[a]",
     "-map", "[v]", "-map", "[a]", "-t", String(duration), "-c:v", "libx264", "-preset", "veryfast",
     "-crf", "22", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", partial];
   const proc = spawn(FFMPEG, args, { windowsHide: true });
@@ -50,7 +50,7 @@ async function buildVideo(scenes, voicePath, subtitlePath, options = {}) {
       while (sceneIndex < timeline.length - 1 && time >= timeline[sceneIndex].end) sceneIndex++;
       const timing = timeline[sceneIndex];
       const progress = Math.min(1, (time - timing.start) / (timing.end - timing.start));
-      drawFrame(ctx, rw, rh, scenes[sceneIndex], time - timing.start, progress, time / duration);
+      drawFrame(ctx, rw, rh, renderScenes[sceneIndex], time - timing.start, progress, time / duration);
       if (!proc.stdin.write(canvas.toBuffer("raw"))) {
         await Promise.race([once(proc.stdin, "drain"), finished.then(() => { throw new Error("Encoder ended before all frames were written"); })]);
       }

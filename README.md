@@ -1,6 +1,6 @@
 # What If Systems — Shorts only
 
-A 100-topic series about banking, money, AI, automation, the internet, digital identity, and everyday infrastructure. All scripts, artwork, speech, captions, and video rendering run locally without AI or stock-media API keys.
+A 100-topic series about banking, money, AI, automation, the internet, digital identity, and everyday infrastructure. Scripts, artwork, captions, and video rendering run locally. Narration uses Microsoft's online neural speech through edge-tts, without a separate API key. No AI image or stock-footage service is used.
 
 ## Review the topics
 
@@ -12,9 +12,11 @@ Scripts have five or six narrated beats. Runtime follows actual speech, and this
 
 - Node.js 20 or newer: `npm ci`.
 - Install FFmpeg and FFprobe with libass/subtitle support.
-- Windows uses installed System.Speech voices. Optional `TTS_VOICE` must be a voice name available to that engine.
-- Ubuntu/Debian: `sudo apt-get install ffmpeg espeak-ng fonts-dejavu-core`.
-- macOS requires FFmpeg and espeak-ng.
+- Install Python and the neural speech dependency: `python -m pip install -r requirements-voice.txt`.
+- Ubuntu/Debian: `sudo apt-get install ffmpeg fonts-dejavu-core`.
+- Default voice: `en-US-AndrewMultilingualNeural`, with `TTS_RATE=+8%`. Configure `TTS_VOICE` and `TTS_RATE` to select another supported neural voice or pace. `PYTHON_PATH` can point to a specific Python executable.
+- Narration text is sent to Microsoft's online speech service. An internet connection is required; a failed neural request stops the run rather than substituting a system voice.
+- For development only, `TTS_PROVIDER=offline` explicitly selects the previous Windows System.Speech / Linux espeak-ng engine. It is not an automatic fallback, and CI uses neural speech.
 - Copy `.env.example` to `.env` for optional executable paths or publishing credentials.
 
 ```sh
@@ -38,9 +40,9 @@ The three daily schedule slots remain 09:00, 13:00, and 20:00 IST. GitHub schedu
 
 ## Visuals and editorial scope
 
-System-specific animated settings include bank queues, ledgers, cash flows, payment counters, AI tools, human fallback work, deliveries, networks, records, satellites, timing, factories, transport, energy, cold storage, water pumps, and buildings. Scenes are moving schematic illustrations, not live footage or numerical forecasts.
+System-specific animated settings include bank queues, ledgers, cash flows, payment counters, AI tools, human fallback work, deliveries, networks, records, satellites, timing, factories, transport, energy, cold storage, water pumps, and buildings. Scenes are moving schematic illustrations, not live footage or numerical forecasts. The soundtrack is the normalized narration, without the old generated background drone.
 
-Update shot selection in `services/storyboardService.js`, systems artwork in `services/systemSceneService.js`, and composition in `services/animationService.js`. Scene boundaries use measured audio durations; word captions and cuts within a scene use proportional timing rather than speech recognition alignment. Offline system voices can sound more mechanical than online neural voices.
+Update shot selection in `services/storyboardService.js`, systems artwork in `services/systemSceneService.js`, and composition in `services/animationService.js`. Scene durations are measured from decoded audio. Neural captions use word timestamps returned by the speech service; shot boundaries use those timestamps when the service text matches the source, otherwise cuts retain proportional estimates. Voice settings are recorded in `storage/audio/voice-info.json`. Audio is normalized to a consistent loudness before rendering.
 
 These are conditional thought experiments, not claims that an outage is happening. Financial scripts distinguish access, liquidity, solvency, records, and payment methods, and do not predict universal bank failure. The first banking, payment, and GPS scripts include primary-source background links; references are not comprehensive verification of all hypothetical outcomes. Other entries are authored scenarios that still require editorial judgment. No AI fact checker is called.
 

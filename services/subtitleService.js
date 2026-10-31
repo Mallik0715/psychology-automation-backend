@@ -46,6 +46,15 @@ function chunkCue(start, end, text, wordsPerChunk) {
   return chunks;
 }
 
+function timedWordChunks(words, wordsPerChunk) {
+  const chunks = [];
+  for (let i = 0; i < words.length; i += wordsPerChunk) {
+    const group = words.slice(i, i + wordsPerChunk);
+    chunks.push({ start: group[0].start, end: group.at(-1).end, text: group.map(w => w.text).join(" ").toUpperCase() });
+  }
+  return chunks;
+}
+
 // ASS time format: h:mm:ss.cc
 function secondsToAssTimestamp(sec) {
   const totalCs = Math.max(0, Math.round(sec * 100));
@@ -110,7 +119,17 @@ async function generateSubtitles(sentences, options = {}) {
     // Words within a scene are distributed proportionally, not forced-aligned.
     for (let i = 0; i < timeline.length; i++) {
       const cue = timeline[i];
-      const shots = options.scenes?.[i]?.shots;
+      const shots = cue.shots || options.scenes?.[i]?.shots;
+      if (cue.words?.length) {
+        if (shots?.length) {
+          for (const shot of shots) {
+            const start = cue.start + (cue.end - cue.start) * shot.from;
+            const end = cue.start + (cue.end - cue.start) * shot.to;
+            chunks.push(...timedWordChunks(cue.words.filter(w => w.start >= start - 0.000001 && w.start < end - 0.000001), wordsPerChunk));
+          }
+        } else chunks.push(...timedWordChunks(cue.words, wordsPerChunk));
+        continue;
+      }
       if (shots?.length) {
         for (const shot of shots) {
           const start = cue.start + (cue.end - cue.start) * shot.from;
@@ -142,4 +161,4 @@ async function generateSubtitles(sentences, options = {}) {
   return output;
 }
 
-module.exports = { generateSubtitles };
+module.exports = { generateSubtitles, timedWordChunks };
