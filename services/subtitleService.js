@@ -61,8 +61,8 @@ function secondsToAssTimestamp(sec) {
 // Colours are &HAABBGGRR.
 function assHeader(width, height) {
   const vertical = height > width;
-  const fontSize = vertical ? 88 : 64;
-  const marginV = vertical ? 520 : 70;
+  const fontSize = vertical ? 76 : 64;
+  const marginV = vertical ? 330 : 70;
   const outline = vertical ? 6 : 4;
   return `[Script Info]
 ScriptType: v4.00+
@@ -100,6 +100,28 @@ async function generateSubtitles(sentences, options = {}) {
   const vttPath = path.join(__dirname, "../storage/audio/words.vtt");
 
   const chunks = [];
+  const localTimingsPath = path.join(__dirname, "../storage/audio/timings.json");
+  if (fs.existsSync(localTimingsPath)) {
+    const timeline = JSON.parse(fs.readFileSync(localTimingsPath, "utf8"));
+    if (timeline.length !== sentences.length || timeline.some((cue, i) => cue.text !== sentences[i])) {
+      throw new Error("Subtitle timing does not match the current narration");
+    }
+    // Each scene is synthesized separately, so scene boundaries are measured.
+    // Words within a scene are distributed proportionally, not forced-aligned.
+    for (let i = 0; i < timeline.length; i++) {
+      const cue = timeline[i];
+      const shots = options.scenes?.[i]?.shots;
+      if (shots?.length) {
+        for (const shot of shots) {
+          const start = cue.start + (cue.end - cue.start) * shot.from;
+          const end = cue.start + (cue.end - cue.start) * shot.to;
+          chunks.push(...chunkCue(start, end, shot.passage, wordsPerChunk));
+        }
+      } else chunks.push(...chunkCue(cue.start, cue.end, cue.text, wordsPerChunk));
+    }
+    fs.writeFileSync(output, assHeader(width, height) + chunks.map(c => assEvent(c.start, c.end, c.text)).join("\n") + "\n");
+    return output;
+  }
   const cues = parseTimings(vttPath);
 
   if (cues && cues.length > 0) {

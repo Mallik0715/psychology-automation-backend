@@ -1,123 +1,84 @@
-name: Psychology Channel Uploads (Daily Short + Weekly Long Video)
+name: What If Systems Shorts
 
 on:
+  push:
+    branches: [feature/what-if-system-shorts]
+    paths-ignore: ['services/topic_progress.json']
+  pull_request:
+    branches: [main]
   schedule:
-    # Timed for Indian viewers (IST = UTC+5:30)
-    - cron: '30 3 * * *'   # 9:00 AM IST
-    - cron: '30 7 * * *'   # 1:00 PM IST
-    - cron: '30 14 * * *'  # 8:00 PM IST
-    # Weekly 5-Minute Long Video every Sunday at 12:00 PM IST (06:30 UTC)
-    - cron: '0 16 * * 0'   # weekly long video: Sunday 12:00 PM ET / 9:30 PM IST
+    - cron: '30 3 * * *'   # 09:00 IST
+    - cron: '30 7 * * *'   # 13:00 IST
+    - cron: '30 14 * * *'  # 20:00 IST
   workflow_dispatch:
     inputs:
-      video_type:
-        description: 'Choose video type to generate'
+      publish:
+        description: 'Publish one Short publicly (false renders a preview artifact)'
+        type: boolean
         required: true
-        default: 'short'
-        type: choice
-        options:
-          - short
-          - long
+        default: true
+      topic_id:
+        description: 'Topic ID 1-100; leave blank for the next queued topic'
+        type: string
+        required: false
+        default: ''
 
-# Never run two uploads at once (they'd race on topic_progress.json)
 concurrency:
   group: youtube-upload
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
-  upload-daily-short:
-    name: Upload Daily Short
-    # Run on any of the 3 daily Short slots, or if triggered manually
-    if: github.event_name == 'schedule' && github.event.schedule != '0 16 * * 0' || (github.event_name == 'workflow_dispatch' && github.event.inputs.video_type == 'short')
+  short:
+    name: Check and render one Short
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
     permissions:
       contents: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-      - name: Install Node dependencies
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
         run: npm ci
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Install Python dependencies
-        run: pip install edge-tts
-      - name: Install FFmpeg
+      - name: Install local rendering and speech tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
-          ffmpeg -version
-      - name: Run Daily Short pipeline
+          sudo apt-get install -y ffmpeg espeak-ng fonts-dejavu-core
+      - name: Test the complete 100-topic catalog and renderer
+        run: npm test
+      - name: Render preview or publish a public Short
         env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          TOPIC_ID: ${{ inputs.topic_id || '' }}
+          PUBLISH_SHORT: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.publish) }}
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
-          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
-        run: node pipeline.js
-
-      - name: Commit updated topic progress
+        run: node scripts/run-ci-short.js
+      - name: Save video and review material
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: what-if-short-${{ github.run_number }}
+          path: |
+            storage/finalVideo.mp4
+            storage/script.txt
+            storage/storyboard.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Record progress on the branch that published
+        if: success() && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.publish))
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add services/topic_progress.json
-          git diff --staged --quiet && exit 0
-          git commit -m "Update topic progress [skip ci]"
-          git pull --rebase
-          git push
-
-  upload-weekly-long-video:
-    name: Upload Weekly 5-Min Long Video
-    # Run if scheduled on Sunday at 06:30 UTC or manually selected
-    if: github.event_name == 'schedule' && github.event.schedule == '0 16 * * 0' || (github.event_name == 'workflow_dispatch' && github.event.inputs.video_type == 'long')
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      - name: Install Node dependencies
-        run: npm ci
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Install Python dependencies
-        run: pip install edge-tts
-      - name: Install FFmpeg
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
-          ffmpeg -version
-      - name: Run Weekly 5-Minute Video pipeline
-        env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
-          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
-          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
-          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
-          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
-        run: node pipeline-long.js
-
-      - name: Commit updated long-video topic progress
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add services/topic_long_progress.json
-          git diff --staged --quiet && exit 0
-          git commit -m "Update topic progress [skip ci]"
-          git pull --rebase
-          git push
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Advance Shorts topic progress [skip ci]"
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          git push origin "HEAD:$GITHUB_REF_NAME"
