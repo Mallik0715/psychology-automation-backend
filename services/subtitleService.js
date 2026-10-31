@@ -46,6 +46,15 @@ function chunkCue(start, end, text, wordsPerChunk) {
   return chunks;
 }
 
+function timedWordChunks(words, wordsPerChunk) {
+  const chunks = [];
+  for (let i = 0; i < words.length; i += wordsPerChunk) {
+    const group = words.slice(i, i + wordsPerChunk);
+    chunks.push({ start: group[0].start, end: group.at(-1).end, text: group.map(w => w.text).join(" ").toUpperCase() });
+  }
+  return chunks;
+}
+
 // ASS time format: h:mm:ss.cc
 function secondsToAssTimestamp(sec) {
   const totalCs = Math.max(0, Math.round(sec * 100));
@@ -61,8 +70,8 @@ function secondsToAssTimestamp(sec) {
 // Colours are &HAABBGGRR.
 function assHeader(width, height) {
   const vertical = height > width;
-  const fontSize = vertical ? 88 : 64;
-  const marginV = vertical ? 520 : 70;
+  const fontSize = vertical ? 76 : 64;
+  const marginV = vertical ? 330 : 70;
   const outline = vertical ? 6 : 4;
   return `[Script Info]
 ScriptType: v4.00+
@@ -100,6 +109,38 @@ async function generateSubtitles(sentences, options = {}) {
   const vttPath = path.join(__dirname, "../storage/audio/words.vtt");
 
   const chunks = [];
+  const localTimingsPath = path.join(__dirname, "../storage/audio/timings.json");
+  if (fs.existsSync(localTimingsPath)) {
+    const timeline = JSON.parse(fs.readFileSync(localTimingsPath, "utf8"));
+    if (timeline.length !== sentences.length || timeline.some((cue, i) => cue.text !== sentences[i])) {
+      throw new Error("Subtitle timing does not match the current narration");
+    }
+    // Each scene is synthesized separately, so scene boundaries are measured.
+    // Words within a scene are distributed proportionally, not forced-aligned.
+    for (let i = 0; i < timeline.length; i++) {
+      const cue = timeline[i];
+      const shots = cue.shots || options.scenes?.[i]?.shots;
+      if (cue.words?.length) {
+        if (shots?.length) {
+          for (const shot of shots) {
+            const start = cue.start + (cue.end - cue.start) * shot.from;
+            const end = cue.start + (cue.end - cue.start) * shot.to;
+            chunks.push(...timedWordChunks(cue.words.filter(w => w.start >= start - 0.000001 && w.start < end - 0.000001), wordsPerChunk));
+          }
+        } else chunks.push(...timedWordChunks(cue.words, wordsPerChunk));
+        continue;
+      }
+      if (shots?.length) {
+        for (const shot of shots) {
+          const start = cue.start + (cue.end - cue.start) * shot.from;
+          const end = cue.start + (cue.end - cue.start) * shot.to;
+          chunks.push(...chunkCue(start, end, shot.passage, wordsPerChunk));
+        }
+      } else chunks.push(...chunkCue(cue.start, cue.end, cue.text, wordsPerChunk));
+    }
+    fs.writeFileSync(output, assHeader(width, height) + chunks.map(c => assEvent(c.start, c.end, c.text)).join("\n") + "\n");
+    return output;
+  }
   const cues = parseTimings(vttPath);
 
   if (cues && cues.length > 0) {
@@ -120,4 +161,4 @@ async function generateSubtitles(sentences, options = {}) {
   return output;
 }
 
-module.exports = { generateSubtitles };
+module.exports = { generateSubtitles, timedWordChunks };
